@@ -8,6 +8,6 @@ Project for Deep Learning in Genomics at Brown
 * We will use GitHub for sharing code
 ## For week of Nov 12th
 ### TODOs - complete by 11/21/2023
-    - [ ] Create the data loader/preprocessing code (Farran and Afnan)
-        - [ ] This involves doing the data loading
-    - [ ] Implement the model/transformer (Aidan and Max)
+* [ ] Create the data loader/preprocessing code (Farran and Afnan)
+    + [ ] This involves doing the data loading
+* [ ] Implement the model/transformer (Aidan and Max)
