@@ -1,6 +1,7 @@
 import math
 import gc
 import os
+import datetime
 
 import numpy as np
 import pandas as pd
@@ -12,14 +13,17 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torch.cuda.amp import GradScaler, autocast
 
+import sqlite3
+from psycopg2.extras import execute_values
+
 from fastai.vision.all import *
 import fastai
 
 # Source: https://www.kaggle.com/code/iafoss/rna-starter-0-186-lb
 
 # Globals
-PATH = '/users/mzuo6/genomics/data/'
-OUT = './'
+PATH = '/oscar/data/sbach/bats/datasets/ribonanza'
+OUT = '/users/alabella/out/ribonanza'
 bs = 256
 num_workers = 2
 SEED = 2023
@@ -283,6 +287,35 @@ class RNA_Model(nn.Module):
     return x
 
 
+def report_to_postgres(values):
+    connection = sqlite3.connect('/oscar/data/sbach/alabella/results/ribonanza.db')    
+    job_id = datetime.now().strftime('%m%d%y%H%M')
+
+    # Create a cursor object to execute SQL queries
+    cursor = connection.cursor()
+
+    table_name = "results"
+
+    # Create the table if it doesn't exist
+    # Insert data into the table
+    for epoch in range(0, len(values)):
+        value = values[epoch]
+
+        data = [job_id, epoch + 1] + value
+
+        cols = ",".join(str(d) for d in data)
+        insert_query = f"INSERT INTO {table_name} (id, epoch, train_loss, valid_loss, mae) VALUES({cols})"
+
+        print(insert_query)
+
+        cursor.execute(insert_query)
+
+
+    # Commit the changes and close the connection
+    connection.commit()
+    connection.close()
+
+
 def loss(pred, target):
   p = pred[target['mask'][:, :pred.shape[1]]]
   y = target['react'][target['mask']].clip(0, 1)
@@ -365,9 +398,14 @@ if __name__ == '__main__':
     )
     #fp16 doesn't help at P100 but gives x1.6-1.8 speedup at modern hardware
 
-    learn.fit_one_cycle(32, lr_max=5e-4, wd=0.05, pct_start=0.02)
-    torch.save(
-        learn.model.state_dict(),
-        os.path.join(OUT, f'{fname}_{fold}.pth'),
-    )
+    learn.fit_one_cycle(50, lr_max=5e-4, wd=0.05, pct_start=0.02)
+
+
+    # torch.save(
+        # learn.model.state_dict(),
+        # os.path.join(OUT, f'{fname}_{fold}.pth'),
+    # )
+
+    report_to_postgres(learn.recorder.values)
+
     gc.collect()
